@@ -239,7 +239,7 @@ public class CliFrontend {
 				} catch (Exception e) {
 					LOG.info("Could not properly shut down the client.", e);
 				}
-			} else {
+			} else {//-m yarn-cluster+非detached 会进入这里
 				final Thread shutdownHook;
 				if (clusterId != null) {
 					client = clusterDescriptor.retrieve(clusterId);

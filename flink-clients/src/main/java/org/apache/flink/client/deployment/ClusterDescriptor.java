@@ -45,6 +45,7 @@ public interface ClusterDescriptor<T> extends AutoCloseable {
 
 	/**
 	 * Triggers deployment of a cluster.
+	 * 触发部署一个cluster【如果是flink run -m yarn-cluster example/xx.jar这种的话，返回的是RestClusterClient】
 	 * @param clusterSpecification Cluster specification defining the cluster to deploy
 	 * @return Client for the cluster
 	 * @throws ClusterDeploymentException if the cluster could not be deployed

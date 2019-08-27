@@ -45,15 +45,16 @@ import java.util.Set;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * The JobGraph represents a Flink dataflow program, at the low level that the JobManager accepts.
- * All programs from higher level APIs are transformed into JobGraphs.
+ * The JobGraph represents a Flink dataflow program, at the low level that the JobManager accepts. //jobGraph代表一个Flink 数据流向程序，是jm能接受的低级程序
+ * All programs from higher level APIs are transformed into JobGraphs. //所有高级别api程序被转化成jobGraph
  *
- * <p>The JobGraph is a graph of vertices and intermediate results that are connected together to
- * form a DAG. Note that iterations (feedback edges) are currently not encoded inside the JobGraph
- * but inside certain special vertices that establish the feedback channel amongst themselves.
+ * <p>The JobGraph is a graph of vertices and intermediate results that are connected together to //jobGraph是一个从verices和结果来的图，它连接在一起成为DAG jobGraph
+ * jobGraph
+ * form a DAG. Note that iterations (feedback edges) are currently not encoded inside the JobGraph//记住迭代（返回edge）当前还没有在jobGraph编码，
+ * but inside certain special vertices that establish the feedback channel amongst themselves.//但是在某些特殊的vertices之间，已经建立了反馈通道
  *
- * <p>The JobGraph defines the job-wide configuration settings, while each vertex and intermediate result
- * define the characteristics of the concrete operation and intermediate data.
+ * <p>The JobGraph defines the job-wide configuration settings, while each vertex and intermediate result//jobGraph定义了[工作范围]配置设置,而每个vertex和中间结果
+ * define the characteristics of the concrete operation and intermediate data.//定义了属于具体算子和中间数据的特征。  【意思就是vertex代表算子特征，intermediate result存放数据特征】
  */
 public class JobGraph implements Serializable {
 

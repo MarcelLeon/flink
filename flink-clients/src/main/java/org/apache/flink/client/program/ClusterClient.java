@@ -242,7 +242,7 @@ public abstract class ClusterClient<T> {
 	// ------------------------------------------------------------------------
 
 	/**
-	 * General purpose method to run a user jar from the CliFrontend in either blocking or detached mode, depending
+	 * General purpose method to run a user jar from the CliFrontend in either blocking or detached mode, depending //通用的请求方法to run a user jar fr
 	 * on whether {@code setDetached(true)} or {@code setDetached(false)}.
 	 * @param prog the packaged program
 	 * @param parallelism the parallelism to execute the contained Flink job
@@ -432,10 +432,20 @@ public abstract class ClusterClient<T> {
 		return getOptimizedPlan(compiler, prog.getPlan(), parallelism);
 	}
 
+	/**
+	 * 实现类比如：RestClusterClient 并不会重写getJobGraph方法
+	 * @param flinkConfig
+	 * @param prog
+	 * @param optPlan
+	 * @param savepointSettings
+	 * @return
+	 * @throws ProgramInvocationException
+	 */
 	public static JobGraph getJobGraph(Configuration flinkConfig, PackagedProgram prog, FlinkPlan optPlan, SavepointRestoreSettings savepointSettings) throws ProgramInvocationException {
 		return getJobGraph(flinkConfig, optPlan, prog.getAllLibraries(), prog.getClasspaths(), savepointSettings);
 	}
 
+	//实现类比如：RestClusterClient 并不会重写getJobGraph方法
 	public static JobGraph getJobGraph(Configuration flinkConfig, FlinkPlan optPlan, List<URL> jarFiles, List<URL> classpaths, SavepointRestoreSettings savepointSettings) {
 		JobGraph job;
 		if (optPlan instanceof StreamingPlan) {
