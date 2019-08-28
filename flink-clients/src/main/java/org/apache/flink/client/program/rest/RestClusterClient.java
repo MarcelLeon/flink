@@ -123,7 +123,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * A {@link ClusterClient} implementation that communicates via HTTP REST requests.
+ * A {@link ClusterClient} implementation that communicates via HTTP REST requests.//-m yarn-cluster默认用的是这个
  */
 public class RestClusterClient<T> extends ClusterClient<T> implements NewClusterClient {
 

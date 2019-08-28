@@ -57,18 +57,18 @@ import java.util.Map;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A generator that generates a {@link StreamGraph} from a graph of
+ * A generator that generates a {@link StreamGraph} from a graph of//一个从Transformations生成StreamGraph的生成器
  * {@link Transformation}s.
  *
- * <p>This traverses the tree of {@code Transformations} starting from the sinks. At each
- * transformation we recursively transform the inputs, then create a node in the {@code StreamGraph}
- * and add edges from the input Nodes to our newly created node. The transformation methods
+ * <p>This traverses the tree of {@code Transformations} starting from the sinks. At each//从sinks开始遍历Trans tree
+ * transformation we recursively transform the inputs, then create a node in the {@code StreamGraph}//每次转换时我们递归的转换输入，然后创建一个node在SG中
+ * and add edges from the input Nodes to our newly created node. The transformation methods//然后从inputNode添加端点给我们新创建的node。转换方法返回数据SG中node的IDs，这个id用来表示输入的transformation
  * return the IDs of the nodes in the StreamGraph that represent the input transformation. Several
- * IDs can be returned to be able to deal with feedback transformations and unions.
+ * IDs can be returned to be able to deal with feedback transformations and unions.//可以返回多个id用来处理转换反馈和合并操作
  *
- * <p>Partitioning, split/select and union don't create actual nodes in the {@code StreamGraph}. For
- * these, we create a virtual node in the {@code StreamGraph} that holds the specific property, i.e.
- * partitioning, selector and so on. When an edge is created from a virtual node to a downstream
+ * <p>Partitioning, split/select and union don't create actual nodes in the {@code StreamGraph}. For//这些计算不会在StreamGraph创建实际node
+ * these, we create a virtual node in the {@code StreamGraph} that holds the specific property, i.e.//对于这些算子，我们会创建虚拟node来hold特殊属性。即partitioning selector等
+ * partitioning, selector and so on. When an edge is created from a virtual node to a downstream//当创建虚拟节点到下游节点的edge时，StreamGraph 解析这个节点原始id，并在图中创建具有期望属性的edge，比如这个Graph
  * node the {@code StreamGraph} resolved the id of the original node and creates an edge
  * in the graph with the desired property. For example, if you have this graph:
  *
@@ -76,11 +76,11 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *     Map-1 -&gt; HashPartition-2 -&gt; Map-3
  * </pre>
  *
- * <p>where the numbers represent transformation IDs. We first recurse all the way down. {@code Map-1}
- * is transformed, i.e. we create a {@code StreamNode} with ID 1. Then we transform the
- * {@code HashPartition}, for this, we create virtual node of ID 4 that holds the property
- * {@code HashPartition}. This transformation returns the ID 4. Then we transform the {@code Map-3}.
- * We add the edge {@code 4 -> 3}. The {@code StreamGraph} resolved the actual node with ID 1 and
+ * <p>where the numbers represent transformation IDs. We first recurse all the way down. {@code Map-1}//数字代表trans的id，我们先向下递归，map-1被转换，
+ * is transformed, i.e. we create a {@code StreamNode} with ID 1. Then we transform the//我们创建一个StreamNode id=1。 然后我们转换HashPartition，
+ * {@code HashPartition}, for this, we create virtual node of ID 4 that holds the property//对于它我们创建一个虚拟node id=4，用来持有hashPartition属性
+ * {@code HashPartition}. This transformation returns the ID 4. Then we transform the {@code Map-3}.//这个transformation返回id4.然后我们转化map-3
+ * We add the edge {@code 4 -> 3}. The {@code StreamGraph} resolved the actual node with ID 1 and//我们添加4->3 edge .StreamGraph解决解析id=1d额实际node，并创建携带hashPartition属性的1->3
  * creates and edge {@code 1 -> 3} with the property HashPartition.
  */
 @Internal
@@ -219,7 +219,7 @@ public class StreamGraphGenerator {
 	}
 
 	/**
-	 * Transforms one {@code Transformation}.
+	 * Transforms one {@code Transformation}.//转化一个Trans
 	 *
 	 * <p>This checks whether we already transformed it and exits early in that case. If not it
 	 * delegates to one of the transformation specific methods.
@@ -308,8 +308,8 @@ public class StreamGraphGenerator {
 	/**
 	 * Transforms a {@code UnionTransformation}.
 	 *
-	 * <p>This is easy, we only have to transform the inputs and return all the IDs in a list so
-	 * that downstream operations can connect to all upstream nodes.
+	 * <p>This is easy, we only have to transform the inputs and return all the IDs in a list so//这很简单，我们只需把转化的inputs 返回全部id到一个list
+	 * that downstream operations can connect to all upstream nodes.//这样下游算子可以连接上游全部nodes
 	 */
 	private <T> Collection<Integer> transformUnion(UnionTransformation<T> union) {
 		List<Transformation<T>> inputs = union.getInputs();
@@ -323,9 +323,9 @@ public class StreamGraphGenerator {
 	}
 
 	/**
-	 * Transforms a {@code PartitionTransformation}.
+	 * Transforms a {@code PartitionTransformation}.//转化PartitionTransformation  --比如我遇到的.rebalance()--
 	 *
-	 * <p>For this we create a virtual node in the {@code StreamGraph} that holds the partition
+	 * <p>For this we create a virtual node in the {@code StreamGraph} that holds the partition//对于这我们为StreamGraph创建一个虚拟node 持有partition属性
 	 * property. @see StreamGraphGenerator
 	 */
 	private <T> Collection<Integer> transformPartition(PartitionTransformation<T> partition) {
@@ -334,7 +334,7 @@ public class StreamGraphGenerator {
 
 		Collection<Integer> transformedIds = transform(input);
 		for (Integer transformedId: transformedIds) {
-			int virtualId = Transformation.getNewNodeId();
+			int virtualId = Transformation.getNewNodeId();//新加虚拟node会操作id++
 			streamGraph.addVirtualPartitionNode(
 					transformedId, virtualId, partition.getPartitioner(), partition.getShuffleMode());
 			resultIds.add(virtualId);

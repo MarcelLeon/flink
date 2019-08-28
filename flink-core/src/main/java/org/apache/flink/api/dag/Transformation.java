@@ -34,16 +34,16 @@ import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A {@code Transformation} represents the operation that creates a
- * DataStream. Every DataStream has an underlying
- * {@code Transformation} that is the origin of said DataStream.
+ * A {@code Transformation} represents the operation that creates a//Transformation代表创建了一个DataStream的算子
+ * DataStream. Every DataStream has an underlying//每个DataStream都有一个底层的Transformation，
+ * {@code Transformation} that is the origin of said DataStream.//可以称其为DataStream的源
  *
- * <p>API operations such as DataStream#map create
- * a tree of {@code Transformation}s underneath. When the stream program is to be executed
- * this graph is translated to a StreamGraph using StreamGraphGenerator.
+ * <p>API operations such as DataStream#map create//API操作，像是map()会在底层创建一个Transformation tree。
+ * a tree of {@code Transformation}s underneath. When the stream program is to be executed//当stream程序被执行时
+ * this graph is translated to a StreamGraph using StreamGraphGenerator.//Graph被翻译成StreamGraph 通过StreamGraphGenerator
  *
- * <p>A {@code Transformation} does not necessarily correspond to a physical operation
- * at runtime. Some operations are only logical concepts. Examples of this are union,
+ * <p>A {@code Transformation} does not necessarily correspond to a physical operation//一个Transformation在runtime阶段不必完全对应物理算子
+ * at runtime. Some operations are only logical concepts. Examples of this are union,//一些算子只是逻辑概念。比如union，split/select数据流，分区
  * split/select data stream, partitioning.
  *
  * <p>The following graph of {@code Transformations}:
@@ -85,9 +85,9 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *              |
  *              v
  *             Sink
- * }</pre>
+ * }</pre>//也就是说Transformation是抽象
  *
- * <p>The information about partitioning, union, split/select end up being encoded in the edges
+ * <p>The information about partitioning, union, split/select end up being encoded in the edges//partitioning union split/select的信息最终会被编码在边缘俩连接source和map
  * that connect the sources to the map operation.
  *
  * @param <T> The type of the elements that result from this {@code Transformation}

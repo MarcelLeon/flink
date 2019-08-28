@@ -120,9 +120,9 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
- * The execution graph is the central data structure that coordinates the distributed
- * execution of a data flow. It keeps representations of each parallel task, each
- * intermediate stream, and the communication between them.
+ * The execution graph is the central data structure that coordinates the distributed//exec graph是协调数据流分布执行的核心数据结构
+ * execution of a data flow. It keeps representations of each parallel task, each//它持续代表每个并行任务
+ * intermediate stream, and the communication between them.//每个中间流和他们之间的交互
  *
  * <p>The execution graph consists of the following constructs:
  * <ul>
