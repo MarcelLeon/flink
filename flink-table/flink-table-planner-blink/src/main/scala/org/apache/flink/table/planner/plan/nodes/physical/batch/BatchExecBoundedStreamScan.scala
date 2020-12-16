@@ -19,11 +19,10 @@
 package org.apache.flink.table.planner.plan.nodes.physical.batch
 
 import org.apache.flink.api.dag.Transformation
-import org.apache.flink.runtime.operators.DamBehavior
-import org.apache.flink.table.dataformat.BaseRow
+import org.apache.flink.table.data.RowData
 import org.apache.flink.table.planner.codegen.CodeGeneratorContext
 import org.apache.flink.table.planner.delegation.BatchPlanner
-import org.apache.flink.table.planner.plan.nodes.exec.{BatchExecNode, ExecNode}
+import org.apache.flink.table.planner.plan.nodes.exec.{LegacyBatchExecNode, ExecEdge}
 import org.apache.flink.table.planner.plan.schema.DataStreamTable
 import org.apache.flink.table.planner.plan.utils.ScanUtil
 
@@ -50,7 +49,7 @@ class BatchExecBoundedStreamScan(
     outputRowType: RelDataType)
   extends TableScan(cluster, traitSet, table)
   with BatchPhysicalRel
-  with BatchExecNode[BaseRow] {
+  with LegacyBatchExecNode[RowData] {
 
   val boundedStreamTable: DataStreamTable[Any] = getTable.unwrap(classOf[DataStreamTable[Any]])
 
@@ -73,18 +72,10 @@ class BatchExecBoundedStreamScan(
 
   //~ ExecNode methods -----------------------------------------------------------
 
-  override def getDamBehavior = DamBehavior.PIPELINED
-
-  override def getInputNodes: util.List[ExecNode[BatchPlanner, _]] = List()
-
-  override def replaceInputNode(
-      ordinalInParent: Int,
-      newInputNode: ExecNode[BatchPlanner, _]): Unit = {
-    replaceInput(ordinalInParent, newInputNode.asInstanceOf[RelNode])
-  }
+  override def getInputEdges: util.List[ExecEdge] = List()
 
   override protected def translateToPlanInternal(
-      planner: BatchPlanner): Transformation[BaseRow] = {
+      planner: BatchPlanner): Transformation[RowData] = {
     val config = planner.getTableConfig
     val batchTransform = boundedStreamTable.dataStream.getTransformation
     if (needInternalConversion) {
@@ -98,7 +89,7 @@ class BatchExecBoundedStreamScan(
         config,
         None)
     } else {
-      batchTransform.asInstanceOf[Transformation[BaseRow]]
+      batchTransform.asInstanceOf[Transformation[RowData]]
     }
   }
 

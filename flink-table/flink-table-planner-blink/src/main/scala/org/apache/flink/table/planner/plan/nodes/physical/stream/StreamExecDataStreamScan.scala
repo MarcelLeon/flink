@@ -20,13 +20,13 @@ package org.apache.flink.table.planner.plan.nodes.physical.stream
 
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.streaming.api.datastream.DataStream
-import org.apache.flink.table.dataformat.BaseRow
+import org.apache.flink.table.data.RowData
 import org.apache.flink.table.planner.calcite.FlinkRelBuilder
 import org.apache.flink.table.planner.codegen.CodeGeneratorContext
 import org.apache.flink.table.planner.codegen.OperatorCodeGenerator.ELEMENT
 import org.apache.flink.table.planner.delegation.StreamPlanner
 import org.apache.flink.table.planner.functions.sql.StreamRecordTimestampSqlFunction
-import org.apache.flink.table.planner.plan.nodes.exec.{ExecNode, StreamExecNode}
+import org.apache.flink.table.planner.plan.nodes.exec.LegacyStreamExecNode
 import org.apache.flink.table.planner.plan.schema.DataStreamTable
 import org.apache.flink.table.planner.plan.utils.ScanUtil
 import org.apache.flink.table.runtime.operators.AbstractProcessStreamOperator
@@ -41,8 +41,6 @@ import org.apache.calcite.rel.core.TableScan
 import org.apache.calcite.rel.metadata.RelMetadataQuery
 import org.apache.calcite.rel.{RelNode, RelWriter}
 import org.apache.calcite.rex.RexNode
-
-import java.util
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -59,19 +57,9 @@ class StreamExecDataStreamScan(
     outputRowType: RelDataType)
   extends TableScan(cluster, traitSet, table)
   with StreamPhysicalRel
-  with StreamExecNode[BaseRow]{
+  with LegacyStreamExecNode[RowData]{
 
   val dataStreamTable: DataStreamTable[Any] = getTable.unwrap(classOf[DataStreamTable[Any]])
-
-  def isAccRetract: Boolean = getTable.unwrap(classOf[DataStreamTable[Any]]).isAccRetract
-
-  override def producesUpdates: Boolean = dataStreamTable.producesUpdates
-
-  override def needsUpdatesAsRetraction(input: RelNode): Boolean = false
-
-  override def consumesRetractions: Boolean = false
-
-  override def producesRetractions: Boolean = producesUpdates && isAccRetract
 
   override def requireWatermark: Boolean = false
 
@@ -94,16 +82,8 @@ class StreamExecDataStreamScan(
 
   //~ ExecNode methods -----------------------------------------------------------
 
-  override def getInputNodes: util.List[ExecNode[StreamPlanner, _]] = List()
-
-  override def replaceInputNode(
-      ordinalInParent: Int,
-      newInputNode: ExecNode[StreamPlanner, _]): Unit = {
-    replaceInput(ordinalInParent, newInputNode.asInstanceOf[RelNode])
-  }
-
   override protected def translateToPlanInternal(
-      planner: StreamPlanner): Transformation[BaseRow] = {
+      planner: StreamPlanner): Transformation[RowData] = {
     val config = planner.getTableConfig
     val inputDataStream: DataStream[Any] = dataStreamTable.dataStream
     val transform = inputDataStream.getTransformation
@@ -111,7 +91,7 @@ class StreamExecDataStreamScan(
     val rowtimeExpr = getRowtimeExpression(planner.getRelBuilder)
 
     // when there is row time extraction expression, we need internal conversion
-    // when the physical type of the input date stream is not BaseRow, we need internal conversion.
+    // when the physical type of the input date stream is not RowData, we need internal conversion.
     if (rowtimeExpr.isDefined || ScanUtil.needsConversion(dataStreamTable.dataType)) {
 
       // extract time if the index is -1 or -2.
@@ -122,7 +102,7 @@ class StreamExecDataStreamScan(
           ("", "")
         }
       val ctx = CodeGeneratorContext(config).setOperatorBaseClass(
-        classOf[AbstractProcessStreamOperator[BaseRow]])
+        classOf[AbstractProcessStreamOperator[RowData]])
       ScanUtil.convertToInternalRow(
         ctx,
         transform,
@@ -135,7 +115,7 @@ class StreamExecDataStreamScan(
         beforeConvert = extractElement,
         afterConvert = resetElement)
     } else {
-      transform.asInstanceOf[Transformation[BaseRow]]
+      transform.asInstanceOf[Transformation[RowData]]
     }
   }
 

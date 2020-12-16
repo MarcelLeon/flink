@@ -20,9 +20,9 @@ package org.apache.flink.table.planner.plan.nodes.physical.stream
 
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.streaming.api.transformations.UnionTransformation
-import org.apache.flink.table.dataformat.BaseRow
+import org.apache.flink.table.data.RowData
 import org.apache.flink.table.planner.delegation.StreamPlanner
-import org.apache.flink.table.planner.plan.nodes.exec.{ExecNode, StreamExecNode}
+import org.apache.flink.table.planner.plan.nodes.exec.LegacyStreamExecNode
 
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.`type`.RelDataType
@@ -44,17 +44,9 @@ class StreamExecUnion(
     outputRowType: RelDataType)
   extends Union(cluster, traitSet, inputRels, all)
   with StreamPhysicalRel
-  with StreamExecNode[BaseRow] {
+  with LegacyStreamExecNode[RowData] {
 
   require(all, "Only support union all")
-
-  override def producesUpdates: Boolean = false
-
-  override def needsUpdatesAsRetraction(input: RelNode): Boolean = false
-
-  override def consumesRetractions: Boolean = false
-
-  override def producesRetractions: Boolean = false
 
   override def requireWatermark: Boolean = false
 
@@ -70,20 +62,10 @@ class StreamExecUnion(
 
   //~ ExecNode methods -----------------------------------------------------------
 
-  override def getInputNodes: util.List[ExecNode[StreamPlanner, _]] = {
-    getInputs.map(_.asInstanceOf[ExecNode[StreamPlanner, _]])
-  }
-
-  override def replaceInputNode(
-      ordinalInParent: Int,
-      newInputNode: ExecNode[StreamPlanner, _]): Unit = {
-    replaceInput(ordinalInParent, newInputNode.asInstanceOf[RelNode])
-  }
-
   override protected def translateToPlanInternal(
-      planner: StreamPlanner): Transformation[BaseRow] = {
+      planner: StreamPlanner): Transformation[RowData] = {
     val transformations = getInputNodes.map {
-      input => input.translateToPlan(planner).asInstanceOf[Transformation[BaseRow]]
+      input => input.translateToPlan(planner).asInstanceOf[Transformation[RowData]]
     }
     new UnionTransformation(transformations)
   }

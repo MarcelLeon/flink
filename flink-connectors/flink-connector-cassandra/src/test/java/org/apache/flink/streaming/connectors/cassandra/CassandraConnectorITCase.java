@@ -44,7 +44,9 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkContextUtil;
 import org.apache.flink.streaming.runtime.operators.WriteAheadSinkTestBase;
-import org.apache.flink.table.api.java.StreamTableEnvironment;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.api.internal.TableEnvironmentInternal;
+import org.apache.flink.testutils.junit.FailsOnJava11;
 import org.apache.flink.types.Row;
 
 import com.datastax.driver.core.Cluster;
@@ -60,6 +62,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +93,7 @@ import static org.junit.Assert.assertTrue;
  * IT cases for all cassandra sinks.
  */
 @SuppressWarnings("serial")
+@Category(FailsOnJava11.class)
 public class CassandraConnectorITCase extends WriteAheadSinkTestBase<Tuple3<String, Integer, Integer>, CassandraTupleWriteAheadSink<Tuple3<String, Integer, Integer>>> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(CassandraConnectorITCase.class);
@@ -458,17 +462,16 @@ public class CassandraConnectorITCase extends WriteAheadSinkTestBase<Tuple3<Stri
 
 		DataStreamSource<Row> source = env.fromCollection(rowCollection);
 
-		tEnv.registerDataStream("testFlinkTable", source);
-		tEnv.registerTableSink(
+		tEnv.createTemporaryView("testFlinkTable", source);
+		((TableEnvironmentInternal) tEnv).registerTableSinkInternal(
 			"cassandraTable",
 			new CassandraAppendTableSink(builder, injectTableName(INSERT_DATA_QUERY)).configure(
 				new String[]{"f0", "f1", "f2"},
 				new TypeInformation[]{Types.STRING, Types.INT, Types.INT}
 			));
 
-		tEnv.sqlQuery("select * from testFlinkTable").insertInto("cassandraTable");
+		tEnv.sqlQuery("select * from testFlinkTable").executeInsert("cassandraTable").await();
 
-		env.execute();
 		ResultSet rs = session.execute(injectTableName(SELECT_DATA_QUERY));
 
 		// validate that all input was correctly written to Cassandra
