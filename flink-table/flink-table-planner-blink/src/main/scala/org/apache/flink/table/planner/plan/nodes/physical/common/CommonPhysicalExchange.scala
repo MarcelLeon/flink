@@ -18,12 +18,16 @@
 
 package org.apache.flink.table.planner.plan.nodes.physical.common
 
+import org.apache.flink.table.api.TableException
 import org.apache.flink.table.planner.plan.`trait`.FlinkRelDistribution
 import org.apache.flink.table.planner.plan.cost.FlinkCost._
 import org.apache.flink.table.planner.plan.cost.FlinkCostFactory
+import org.apache.flink.table.planner.plan.nodes.exec.InputProperty
+import org.apache.flink.table.planner.plan.nodes.exec.InputProperty.RequiredDistribution
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel
 
 import org.apache.calcite.plan.{RelOptCluster, RelOptCost, RelOptPlanner, RelTraitSet}
+import org.apache.calcite.rel.RelDistribution.Type
 import org.apache.calcite.rel.core.Exchange
 import org.apache.calcite.rel.metadata.RelMetadataQuery
 import org.apache.calcite.rel.{RelDistribution, RelNode, RelWriter}
@@ -31,14 +35,14 @@ import org.apache.calcite.rel.{RelDistribution, RelNode, RelWriter}
 import scala.collection.JavaConverters._
 
 /**
-  * Base class for flink [[Exchange]].
-  */
+ * Base class for flink [[Exchange]].
+ */
 abstract class CommonPhysicalExchange(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
-    relNode: RelNode,
+    inputRel: RelNode,
     relDistribution: RelDistribution)
-  extends Exchange(cluster, traitSet, relNode, relDistribution)
+  extends Exchange(cluster, traitSet, inputRel, relDistribution)
   with FlinkPhysicalRel {
 
   override def computeSelfCost(planner: RelOptPlanner, mq: RelMetadataQuery): RelOptCost = {
@@ -106,4 +110,21 @@ abstract class CommonPhysicalExchange(
     if (fieldNames.isEmpty) exchangeName else exchangeName + fieldNames
   }
 
+  protected def getRequiredDistribution: RequiredDistribution = {
+    relDistribution.getType match {
+      case Type.ANY => InputProperty.ANY_DISTRIBUTION
+      case Type.BROADCAST_DISTRIBUTED => InputProperty.BROADCAST_DISTRIBUTION
+      case Type.SINGLETON => InputProperty.SINGLETON_DISTRIBUTION
+      case Type.HASH_DISTRIBUTED =>
+        val keys = relDistribution.getKeys.asScala.map(_.intValue()).toArray
+        if (keys.isEmpty) {
+          InputProperty.SINGLETON_DISTRIBUTION
+        } else {
+          // Hash Shuffle requires not empty keys
+          InputProperty.hashDistribution(keys)
+        }
+      case _ =>
+        throw new TableException(s"Unsupported distribution type: ${relDistribution.getType}")
+    }
+  }
 }

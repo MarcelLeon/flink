@@ -41,7 +41,8 @@ import java.io.ObjectInputStream;
 import java.util.Objects;
 
 /**
- * A serializer that can serialize and deserialize all data structures defined by a {@link DataType}.
+ * A serializer that can serialize and deserialize all data structures defined by a {@link
+ * DataType}.
  *
  * <p>This class combines {@link DataStructureConverters} and {@link InternalSerializers} into one
  * entity. The serialized binary format is always an internal binary format.
@@ -54,205 +55,238 @@ import java.util.Objects;
 @Internal
 public final class ExternalSerializer<I, E> extends TypeSerializer<E> {
 
-	private final DataType dataType;
+    private final DataType dataType;
 
-	private final TypeSerializer<I> internalSerializer;
+    private final TypeSerializer<I> internalSerializer;
 
-	private final boolean isReuseEnabled;
+    private final boolean isInternalInput;
 
-	private transient I reuse;
+    private final boolean isReuseEnabled;
 
-	private transient DataStructureConverter<I, E> converter;
+    private transient I reuse;
 
-	private ExternalSerializer(DataType dataType, TypeSerializer<I> internalSerializer) {
-		this.dataType = dataType;
-		this.internalSerializer = internalSerializer;
-		// if no data structures that use memory segments are exposed in the external data structure,
-		// we can reuse intermediate internal data structures
-		this.isReuseEnabled = !hasBinaryData(dataType);
-		initializeConverter();
-	}
+    private transient DataStructureConverter<I, E> converter;
 
-	/**
-	 * Creates an instance of a {@link ExternalSerializer} defined by the given {@link DataType}.
-	 */
-	public static <I, E> ExternalSerializer<I, E> of(DataType dataType) {
-		return new ExternalSerializer<>(dataType, InternalSerializers.create(dataType.getLogicalType()));
-	}
+    private ExternalSerializer(
+            DataType dataType, TypeSerializer<I> internalSerializer, boolean isInternalInput) {
+        this.dataType = dataType;
+        this.internalSerializer = internalSerializer;
+        this.isInternalInput = isInternalInput;
+        // if no data structures that use memory segments are exposed in the external data
+        // structure, we can reuse intermediate internal data structures
+        this.isReuseEnabled = !hasBinaryData(dataType);
+        initializeConverter();
+    }
 
-	@Override
-	public boolean isImmutableType() {
-		return internalSerializer.isImmutableType();
-	}
+    /**
+     * Creates an instance of a {@link ExternalSerializer} defined by the given {@link DataType}.
+     */
+    public static <I, E> ExternalSerializer<I, E> of(DataType dataType) {
+        return of(dataType, false);
+    }
 
-	@Override
-	public TypeSerializer<E> duplicate() {
-		return new ExternalSerializer<>(dataType, internalSerializer.duplicate());
-	}
+    /**
+     * Creates an instance of a {@link ExternalSerializer} defined by the given {@link DataType}.
+     */
+    public static <I, E> ExternalSerializer<I, E> of(DataType dataType, boolean isInternalInput) {
+        return new ExternalSerializer<>(
+                dataType, InternalSerializers.create(dataType.getLogicalType()), isInternalInput);
+    }
 
-	@Override
-	public E createInstance() {
-		// in some cases this fails
-		// e.g. for objects backed by non-existing binary sections
-		try {
-			I instance = internalSerializer.createInstance();
-			return converter.toExternal(instance);
-		} catch (Throwable t) {
-			return null;
-		}
-	}
+    @Override
+    public boolean isImmutableType() {
+        return internalSerializer.isImmutableType();
+    }
 
-	@Override
-	public E copy(E from) {
-		final I internalFrom = converter.toInternal(from);
-		final I copy = internalSerializer.copy(internalFrom);
-		return converter.toExternal(copy);
-	}
+    @Override
+    public TypeSerializer<E> duplicate() {
+        return new ExternalSerializer<>(dataType, internalSerializer.duplicate(), isInternalInput);
+    }
 
-	@Override
-	public E copy(E from, E reuse) {
-		return copy(from);
-	}
+    @Override
+    public E createInstance() {
+        // in some cases this fails
+        // e.g. for objects backed by non-existing binary sections
+        try {
+            I instance = internalSerializer.createInstance();
+            return converter.toExternal(instance);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
 
-	@Override
-	public int getLength() {
-		return internalSerializer.getLength();
-	}
+    @Override
+    @SuppressWarnings("unchecked")
+    public E copy(E from) {
+        final I internalFrom;
+        if (isInternalInput) {
+            internalFrom = (I) from;
+        } else {
+            internalFrom = converter.toInternal(from);
+        }
+        final I copy = internalSerializer.copy(internalFrom);
+        return converter.toExternal(copy);
+    }
 
-	@Override
-	public void serialize(E record, DataOutputView target) throws IOException {
-		final I internalRecord = converter.toInternal(record);
-		internalSerializer.serialize(internalRecord, target);
-	}
+    @Override
+    public E copy(E from, E reuse) {
+        return copy(from);
+    }
 
-	@Override
-	public E deserialize(DataInputView source) throws IOException {
-		if (isReuseEnabled) {
-			reuse = internalSerializer.deserialize(reuse, source);
-			return converter.toExternal(reuse);
-		} else {
-			final I internalRecord = internalSerializer.deserialize(source);
-			return converter.toExternal(internalRecord);
-		}
-	}
+    @Override
+    public int getLength() {
+        return internalSerializer.getLength();
+    }
 
-	@Override
-	public E deserialize(E reuse, DataInputView source) throws IOException {
-		return deserialize(source);
-	}
+    @Override
+    @SuppressWarnings("unchecked")
+    public void serialize(E record, DataOutputView target) throws IOException {
+        final I internalRecord;
+        if (isInternalInput) {
+            internalRecord = (I) record;
+        } else {
+            internalRecord = converter.toInternal(record);
+        }
+        internalSerializer.serialize(internalRecord, target);
+    }
 
-	@Override
-	public void copy(DataInputView source, DataOutputView target) throws IOException {
-		internalSerializer.copy(source, target);
-	}
+    @Override
+    public E deserialize(DataInputView source) throws IOException {
+        if (isReuseEnabled) {
+            reuse = internalSerializer.deserialize(reuse, source);
+            return converter.toExternal(reuse);
+        } else {
+            final I internalRecord = internalSerializer.deserialize(source);
+            return converter.toExternal(internalRecord);
+        }
+    }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) {
-			return true;
-		}
-		if (o == null || getClass() != o.getClass()) {
-			return false;
-		}
-		ExternalSerializer<?, ?> that = (ExternalSerializer<?, ?>) o;
-		return dataType.equals(that.dataType) &&
-			internalSerializer.equals(that.internalSerializer);
-	}
+    @Override
+    public E deserialize(E reuse, DataInputView source) throws IOException {
+        return deserialize(source);
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(dataType, internalSerializer);
-	}
+    @Override
+    public void copy(DataInputView source, DataOutputView target) throws IOException {
+        internalSerializer.copy(source, target);
+    }
 
-	@Override
-	public TypeSerializerSnapshot<E> snapshotConfiguration() {
-		return new ExternalSerializerSnapshot<>(this);
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ExternalSerializer<?, ?> that = (ExternalSerializer<?, ?>) o;
+        return dataType.equals(that.dataType)
+                && internalSerializer.equals(that.internalSerializer)
+                && isInternalInput == that.isInternalInput;
+    }
 
-	// ---------------------------------------------------------------------------------
+    @Override
+    public int hashCode() {
+        return Objects.hash(dataType, internalSerializer, isInternalInput);
+    }
 
-	private void readObject(ObjectInputStream serialized) throws IOException, ClassNotFoundException {
-		serialized.defaultReadObject();
-		initializeConverter();
-	}
+    @Override
+    public TypeSerializerSnapshot<E> snapshotConfiguration() {
+        return new ExternalSerializerSnapshot<>(this);
+    }
 
-	@SuppressWarnings("unchecked")
-	private void initializeConverter() {
-		converter = (DataStructureConverter<I, E>) DataStructureConverters.getConverter(dataType);
-		converter.open(Thread.currentThread().getContextClassLoader());
-	}
+    // ---------------------------------------------------------------------------------
 
-	private static boolean hasBinaryData(DataType dataType) {
-		if (dataType.getChildren().stream().anyMatch(ExternalSerializer::hasBinaryData)) {
-			return true;
-		}
-		final Class<?> clazz = dataType.getConversionClass();
-		return clazz == RowData.class ||
-			clazz == StringData.class ||
-			clazz == ArrayData.class ||
-			clazz == MapData.class ||
-			clazz == RawValueData.class;
-	}
+    private void readObject(ObjectInputStream serialized)
+            throws IOException, ClassNotFoundException {
+        serialized.defaultReadObject();
+        initializeConverter();
+    }
 
-	// ---------------------------------------------------------------------------------
-	// Serializer Snapshot
-	// ---------------------------------------------------------------------------------
+    @SuppressWarnings("unchecked")
+    private void initializeConverter() {
+        converter = (DataStructureConverter<I, E>) DataStructureConverters.getConverter(dataType);
+        converter.open(Thread.currentThread().getContextClassLoader());
+    }
 
-	/**
-	 * {@link TypeSerializerSnapshot} for {@link ExternalSerializer}.
-	 *
-	 * @param <I> internal data structure
-	 * @param <E> external data structure
-	 */
-	public static final class ExternalSerializerSnapshot<I, E>
-			extends CompositeTypeSerializerSnapshot<E, ExternalSerializer<I, E>> {
+    private static boolean hasBinaryData(DataType dataType) {
+        if (dataType.getChildren().stream().anyMatch(ExternalSerializer::hasBinaryData)) {
+            return true;
+        }
+        final Class<?> clazz = dataType.getConversionClass();
+        return clazz == RowData.class
+                || clazz == StringData.class
+                || clazz == ArrayData.class
+                || clazz == MapData.class
+                || clazz == RawValueData.class;
+    }
 
-		private static final int VERSION = 1;
+    // ---------------------------------------------------------------------------------
+    // Serializer Snapshot
+    // ---------------------------------------------------------------------------------
 
-		private DataType dataType;
+    /**
+     * {@link TypeSerializerSnapshot} for {@link ExternalSerializer}.
+     *
+     * @param <I> internal data structure
+     * @param <E> external data structure
+     */
+    public static final class ExternalSerializerSnapshot<I, E>
+            extends CompositeTypeSerializerSnapshot<E, ExternalSerializer<I, E>> {
 
-		public ExternalSerializerSnapshot() {
-			super(ExternalSerializer.class);
-		}
+        private static final int VERSION = 1;
 
-		public ExternalSerializerSnapshot(ExternalSerializer<I, E> externalSerializer) {
-			super(externalSerializer);
-			this.dataType = externalSerializer.dataType;
-		}
+        private DataType dataType;
 
-		@Override
-		protected int getCurrentOuterSnapshotVersion() {
-			return VERSION;
-		}
+        private boolean isInternalInput;
 
-		@Override
-		protected void writeOuterSnapshot(DataOutputView out) throws IOException {
-			final DataOutputViewStream stream = new DataOutputViewStream(out);
-			InstantiationUtil.serializeObject(stream, dataType);
-		}
+        public ExternalSerializerSnapshot() {
+            super(ExternalSerializer.class);
+        }
 
-		@Override
-		protected void readOuterSnapshot(
-				int readOuterSnapshotVersion,
-				DataInputView in,
-				ClassLoader userCodeClassLoader) throws IOException {
-			final DataInputViewStream stream = new DataInputViewStream(in);
-			try {
-				dataType = InstantiationUtil.deserializeObject(stream, userCodeClassLoader);
-			} catch (ClassNotFoundException e) {
-				throw new IOException(e);
-			}
-		}
+        public ExternalSerializerSnapshot(ExternalSerializer<I, E> externalSerializer) {
+            super(externalSerializer);
+            this.dataType = externalSerializer.dataType;
+            this.isInternalInput = externalSerializer.isInternalInput;
+        }
 
-		@Override
-		protected TypeSerializer<?>[] getNestedSerializers(ExternalSerializer<I, E> outerSerializer) {
-			return new TypeSerializer[]{outerSerializer.internalSerializer};
-		}
+        @Override
+        protected int getCurrentOuterSnapshotVersion() {
+            return VERSION;
+        }
 
-		@Override
-		@SuppressWarnings("unchecked")
-		protected ExternalSerializer<I, E> createOuterSerializerWithNestedSerializers(TypeSerializer<?>[] nestedSerializers) {
-			return new ExternalSerializer<>(dataType, (TypeSerializer<I>) nestedSerializers[0]);
-		}
-	}
+        @Override
+        protected void writeOuterSnapshot(DataOutputView out) throws IOException {
+            final DataOutputViewStream stream = new DataOutputViewStream(out);
+            InstantiationUtil.serializeObject(stream, dataType);
+            out.writeBoolean(isInternalInput);
+        }
+
+        @Override
+        protected void readOuterSnapshot(
+                int readOuterSnapshotVersion, DataInputView in, ClassLoader userCodeClassLoader)
+                throws IOException {
+            final DataInputViewStream stream = new DataInputViewStream(in);
+            try {
+                dataType = InstantiationUtil.deserializeObject(stream, userCodeClassLoader);
+            } catch (ClassNotFoundException e) {
+                throw new IOException(e);
+            }
+            isInternalInput = in.readBoolean();
+        }
+
+        @Override
+        protected TypeSerializer<?>[] getNestedSerializers(
+                ExternalSerializer<I, E> outerSerializer) {
+            return new TypeSerializer[] {outerSerializer.internalSerializer};
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        protected ExternalSerializer<I, E> createOuterSerializerWithNestedSerializers(
+                TypeSerializer<?>[] nestedSerializers) {
+            return new ExternalSerializer<>(
+                    dataType, (TypeSerializer<I>) nestedSerializers[0], isInternalInput);
+        }
+    }
 }
